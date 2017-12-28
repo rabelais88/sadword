@@ -1,4 +1,4 @@
-# sadword
+# T.T - project sadword
 
 *this info is subject to change before heroku deploy
 
