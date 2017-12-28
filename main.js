@@ -36,7 +36,7 @@ http.listen(process.env.PORT || 3000,function(){
 });
   
 app.get("/",function(req,res){
-    db.any("SELECT writer_ip, article_content FROM sw_table LIMIT 10")
+    db.any("SELECT writer_ip, article_content FROM sw_article LIMIT 10")
     .then(function(data){
       console.log("current rowlength:" + data.length);
       /* data is provided in an array type made up of anonymous object elements */
@@ -46,5 +46,22 @@ app.get("/",function(req,res){
     .catch(function(err){
       console.log(err);
     });
+});
+
+app.get("/write",function(req,res){
+  res.render("write.ejs");
+});
+
+app.get("/today",function(req,res){
+  db.any("SELECT writer_ip, article_content FROM sw_article LIMIT 10")
+  .then(function(data){
+    console.log("current rowlength:" + data.length);
+    /* data is provided in an array type made up of anonymous object elements */
+    console.log(data);
+    res.render("index.ejs", {data:data});
+  })
+  .catch(function(err){
+    console.log(err);
+  });
 });
 

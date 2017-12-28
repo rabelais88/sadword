@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <% include partials/header %>
+  <!-- body -->
+  <body>
+    <%include partials/nav %>
+    <form action="write" id="frmWrite">
+      <div class="form-group">
+        <label for="article">울고 싶어요 왜냐면...</label>
+        <textarea class="form-control" rows="5" id="article" name="article"></textarea>
+      </div>
+      <button type="submit" class="btn btn-secondary" value="up" name="act"><i class="fa fa-check" aria-hidden="true"></i>보낼게요</button>
+    </form>
+  </body>
+</html>

@@ -4,17 +4,17 @@
   <!-- body -->
   <body>
     <%include partials/nav %>
-    <div class="container-fluid content darken"></div>
-    <div class="list-group">
+    <div class="container-fluid content darken">
       <% data.forEach(function(el,i){ %>
-      <div class="list-group-item flex-column align-items-start">
-        <p class="mb-1"><%= el.article_content %></p>
+        <p><%= el.article_content %></p>
         <small class="text-muted"><%= el.writer_ip %></small>
         <form action="/<%= i %>/">
-          <input type="submit" class="btn btn-outline-secondary" value="공감" name="choice"/>
-          <input type="submit" class="btn btn-outline-secondary" value="신고" name="choice"/>
+          <button type="submit" class="btn btn-link" value="up" name="act"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
+          <button type="submit" class="btn btn-link" value="down" name="act"><i class="fa fa-exclamation" aria-hidden="true"></i>신고</button>
+          <button type="submit" class="btn btn-link" value="edit" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</button>
+          <button type="submit" class="btn btn-link" value="delete" name="act"><i class="fa fa-trash" aria-hidden="true"></i>삭제</button>
         </form>
-      </div>
+        <hr>
       <% }) %>
     </div>
   </body>
