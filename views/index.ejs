@@ -5,7 +5,7 @@
   <body>
     <%include partials/nav %>
     <div class="container-fluid content darken">
-      <% data.forEach(function(el,i){ %>
+      <% articles.forEach(function(el,i){ %>
         <p><%= el.article_content %></p>
         <small class="text-muted"><%= el.writer_ip %></small>
         <form action="/<%= i %>/">
@@ -14,6 +14,9 @@
           <button type="submit" class="btn btn-link" value="edit" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</button>
           <button type="submit" class="btn btn-link" value="delete" name="act"><i class="fa fa-trash" aria-hidden="true"></i>삭제</button>
         </form>
+        <% if(el.comment) { el.comment.forEach(function(elComment, i){ %>
+          └ <%= elComment.comment_content %>
+        <% }) } %>
         <hr>
       <% }) %>
     </div>
