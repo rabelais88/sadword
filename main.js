@@ -7,6 +7,8 @@ var bodyParser = require("body-parser");
 var uuid = require("uuid/v4");
 /* setting up postgreSQL */
 const pgp = require("pg-promise")(/* promise options */);
+const moment = require("moment");
+
 
 const pgconfig = {
   user: "postgres",
@@ -56,9 +58,11 @@ function getArticle(beginRow,endRow,callback){
     db.any("SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow)
     .then(function(dataComment){
       dataComment.forEach(function(elComment){
-        var newcomment = {commenter_ip:elComment.commenter_ip,
-                          comment_content:elComment.comment_content,
-                          comment_id:elComment.comment_id};
+        var newcomment = {
+          commenter_ip:elComment.commenter_ip,
+          comment_content:elComment.comment_content,
+          comment_id:elComment.comment_id
+        };
         dataArticle[elComment.article_id].comment.push(newcomment);
       });
       console.log(dataArticle);
@@ -82,6 +86,22 @@ app.get("/",function(req,res){
 
 app.get("/write",function(req,res){
   res.render("write.ejs");
+});
+
+app.post("/write",function(req,res){
+  var currentTime = moment();
+  var nowFormatted = currentTime.format("YYYY-MM-DD HH:mm:ss");
+  console.log(nowFormatted + " - article add request :" + req);
+  /*
+  db.one("INSERT INTO sw_article (writer_ip, article_content, article_time) VALUES ($1, $2, $3)", ["123.1.1.1", req.article, nowFormatted])
+  .then(function(data){
+
+  })
+  .catch(function(err){
+
+  });
+  */
+  res.redirect("/");
 });
 
 app.get("/today",function(req,res){
