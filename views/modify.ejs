@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <% include partials/header %>
+  <!-- body -->
+  <body>
+    <%include partials/nav %>
+    <div class="container-fluid content darken">
+      <!-- if POST method is not defined, the whole content is likely to be disclosed on the address -->
+      <form method="POST" action="modifyconfirm" id="frmModify">
+        <h4>등록된 글을 수정합니다.</h4>
+        <div class="form-group">
+          <label for="password" class="darken">비밀번호(최대 15자리):</label>
+          <input type="password" class="form-control darken" id="password" name="password" maxlength="15" />
+        </div>
+        <button type="submit" class="btn btn-primary">수정</button>
+      </form>
+    </div>
+  </body>
+</html>

@@ -8,10 +8,10 @@
       <% articles.forEach(function(el,i){ %>
         <p><%= el.article_content %></p>
         <small class="text-muted"><%= el.writer_ip %></small>
-        <form action="/<%= i %>/">
+        <form action="<%= i %>/">
           <button type="submit" class="btn btn-link" value="up" name="act"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
           <button type="submit" class="btn btn-link" value="down" name="act"><i class="fa fa-exclamation" aria-hidden="true"></i>신고</button>
-          <button type="submit" class="btn btn-link" value="edit" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</button>
+          <button type="submit" class="btn btn-link" value="modify" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</button>
           <button type="submit" class="btn btn-link" value="delete" name="act"><i class="fa fa-trash" aria-hidden="true"></i>삭제</button>
         </form>
         <% if(el.comment) { el.comment.forEach(function(elComment, i){ %>
@@ -19,6 +19,10 @@
         <% }) } %>
         <hr>
       <% }) %>
+      <% if(articles.length < 1){ %>
+        <h2>올라온 글이 없거나 서버에 문제가 있어요! ㅜ.ㅜ</h2>
+        <hr>
+      <% } %>
     </div>
   </body>
 </html>

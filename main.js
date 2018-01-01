@@ -14,7 +14,7 @@ const pgconfig = {
   user: "postgres",
   host: "localhost",
   database: "sadword",
-  password: "testhotel1",
+  password: "devtest1",
   port:5432,
   /*
     if it's heroku, replacce those with this:
@@ -44,6 +44,14 @@ http.listen(process.env.PORT || 3000,function(){
   create table sw_comment (comment_id serial primary key, commenter_ip inet, article_id integer references sw_article(article_id), comment_content varchar(150));
 */
 
+function getIP(req){
+  var ip = req.headers['x-forwarded-for'] || 
+  req.connection.remoteAddress || 
+  req.socket.remoteAddress ||
+  (req.connection.socket ? req.connection.socket.remoteAddress : null);
+  return ip;
+}
+
 function getArticle(beginRow,endRow,callback){
   var rowLength = endRow - beginRow;
   db.any("SELECT writer_ip, article_content, article_id FROM sw_article LIMIT " + rowLength + " OFFSET " + beginRow)
@@ -65,15 +73,15 @@ function getArticle(beginRow,endRow,callback){
         };
         dataArticle[elComment.article_id].comment.push(newcomment);
       });
-      console.log(dataArticle);
+      /*console.log(dataArticle);*/
       callback(dataArticle);
     })
     .catch(function(err){
-      console.log(err);
+      res.render("error.ejs",{errormsg:err});
     });
   })
   .catch(function(err){
-    console.log(err);
+    res.render("error.ejs",{errormsg:err});
   });
 }
 
@@ -91,17 +99,74 @@ app.get("/write",function(req,res){
 app.post("/write",function(req,res){
   var currentTime = moment();
   var nowFormatted = currentTime.format("YYYY-MM-DD HH:mm:ss");
-  console.log(nowFormatted + " - article add request :" + req);
-  /*
-  db.one("INSERT INTO sw_article (writer_ip, article_content, article_time) VALUES ($1, $2, $3)", ["123.1.1.1", req.article, nowFormatted])
+  /* always add .body to access req data */
+  console.log(nowFormatted + " - article add request : " + req.body.article + "(" + getIP(req) + ")");
+  db.none("INSERT INTO sw_article (writer_ip, article_content, article_time, article_password) VALUES ($1, $2, $3, $4)", [getIP(req), req.body.article, nowFormatted, req.body.password])
   .then(function(data){
-
+    res.redirect("/");
   })
   .catch(function(err){
-
+    res.render("error.ejs",{errormsg:err});
   });
-  */
-  res.redirect("/");
+});
+
+app.get("/:articleid",function(req,res){
+  /* safety measure for parse error*/
+  var articleid = Math.round(req.params.articleid);
+  console.log("article No." + articleid + " - request : " +  req.query.act);
+  if(req.query.act=="delete"){
+    res.render("delete.ejs", {data:articleid});
+  }else if(req.query.act=="modify"){
+    res.render("modify.ejs", {data:articleid});
+  }else if(req.query.act=="up"){
+    //recommendation
+  }else if(req.query.act=="down"){
+    //denunciation
+  }
+});
+
+app.post("/:articleid/deleteconfirm",function(req,res){
+  var articleid = Math.round(req.params.articleid);
+  db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
+  .then(function(data){
+    console.log("received pw : " + req.body.password + " =?= pw on db : " + data.article_password);
+    if (req.body.password == data.article_password || data.article_password == null){
+      db.none("DELETE FROM sw_article WHERE article_id=" + articleid)
+      .then(function(){
+        res.redirect("/");
+      })
+      .catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }else{
+      res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
+    }
+  })
+  .catch(function(err){
+    res.render("error.ejs",{errormsg:err});
+  });
+});
+
+app.post("/:articleid/modifyconfirm",function(req,res){
+  var articleid = Math.round(req.params.articleid);
+  db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
+  .then(function(data){
+    console.log("received pw : " + req.body.password + " =?= pw on db : " + data.article_password);
+    if (req.body.password == data.article_password || data.article_password == null){
+      db.none("DELETE FROM sw_article WHERE article_id=" + articleid)
+      .then(function(){
+        res.redirect("/");
+      })
+      .catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }else{
+      res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
+    }
+  })
+  .catch(function(err){
+    res.render("error.ejs",{errormsg:err});
+  });
 });
 
 app.get("/today",function(req,res){
@@ -113,7 +178,6 @@ app.get("/today",function(req,res){
     res.render("index.ejs", {data:data});
   })
   .catch(function(err){
-    console.log(err);
+    res.render("error.ejs",{errormsg:err});
   });
 });
-
