@@ -73,7 +73,6 @@ function getArticle(beginRow,endRow,callback){
         };
         dataArticle[elComment.article_id].comment.push(newcomment);
       });
-      /*console.log(dataArticle);*/
       callback(dataArticle);
     })
     .catch(function(err){
@@ -115,13 +114,46 @@ app.get("/:articleid",function(req,res){
   var articleid = Math.round(req.params.articleid);
   console.log("article No." + articleid + " - request : " +  req.query.act);
   if(req.query.act=="delete"){
+    /* deleting article */
     res.render("delete.ejs", {data:articleid});
   }else if(req.query.act=="modify"){
-    res.render("modify.ejs", {data:articleid});
+    /* modifying article */
+    db.one("SELECT article_content FROM sw_article WHERE article_id=" + articleid)
+    .then(function(data){
+      res.render("modify.ejs", {article_content:data.article_content});
+    })
+    .catch(function(err){
+      res.render("error.ejs",{errormsg:err});
+    });
   }else if(req.query.act=="up"){
-    //recommendation
+    /* recommendation */
+    db.one("SELECT exists(SELECT score FROM sw_score WHERE scorer_ip=$1 AND article_id=$2)",[getIP(req),articleid])     .then(function(data){
+      console.log(data);
+      if(data.exists == "f"){
+        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",[getIP(req), true, articleid])
+        .then(function(){
+          res.redirect("/");
+        })
+        .catch(function(err){
+          res.render("error.ejs",{errormsg:err});
+        });
+      }else{
+        res.render("error.ejs",{errormsg:"이미 투표한 글입니다"});
+      }
+    })
+    .catch(function(err){
+      res.render("error.ejs",{errormsg:err});
+    });
+
   }else if(req.query.act=="down"){
-    //denunciation
+    /* denunciation */
+    db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",[getIP(req), false, articleid])
+    .then(function(){
+      res.redirect("/");
+    })
+    .catch(function(err){
+      res.render("error.ejs",{errormsg:err});
+    });
   }
 });
 
@@ -153,7 +185,7 @@ app.post("/:articleid/modifyconfirm",function(req,res){
   .then(function(data){
     console.log("received pw : " + req.body.password + " =?= pw on db : " + data.article_password);
     if (req.body.password == data.article_password || data.article_password == null){
-      db.none("DELETE FROM sw_article WHERE article_id=" + articleid)
+      db.none("UPDATE sw_article SET article_content='" + req.body.article + "' WHERE article_id=" + articleid)
       .then(function(){
         res.redirect("/");
       })

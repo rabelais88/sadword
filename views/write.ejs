@@ -4,6 +4,7 @@
   <!-- body -->
   <body>
     <%include partials/nav %>
+    <div class="container-fluid content darken">
     <!-- if POST method is not defined, the whole content is likely to be disclosed on the address -->
     <form method="POST" action="write" id="frmWrite">
       <div class="form-group">
@@ -16,5 +17,6 @@
       </div>
       <button type="submit" class="btn btn-secondary" value="up" name="act"><i class="fa fa-check" aria-hidden="true"></i>보낼게요</button>
     </form>
+    </div>
   </body>
 </html>
