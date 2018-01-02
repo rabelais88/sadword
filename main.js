@@ -52,32 +52,60 @@ function getIP(req){
   return ip;
 }
 
+function getVote(ip,callback){
+  db.any("SELECT score FROM sw_score WHERE scorer_ip=$1",[ip])
+  .then(function(data){
+    console.log("previous score data from " + ip + " : " + data);
+    /* 
+       source of all problem...probably something has to do with dynamic type 
+       try...catch instead of if(data) or if(data.length > 0)
+       very good lesson for later works
+       wrong value type causes "Unhandled Promise Rejection Errors"
+    */
+    try{
+      callback(data[0].score);
+    }catch(err){
+      callback(0);
+    }
+  })
+  .catch(function(err){
+    res.render("error.ejs",{errormsg:err});
+  });
+}
+
 function getArticle(beginRow,endRow,callback){
   var rowLength = endRow - beginRow;
-  db.any("SELECT writer_ip, article_content, article_id FROM sw_article LIMIT " + rowLength + " OFFSET " + beginRow)
+  db.multi("SELECT * FROM sw_article LIMIT " + rowLength + " OFFSET " + beginRow + 
+  ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow +
+  ";select * from (select article_id, sum(score) from sw_score group by article_id) as tmp LIMIT " + rowLength + " OFFSET " + beginRow)
   .then(function(data){
     var dataArticle = [];
     //console.log("current rowlength:" + data.length);
     /* data is provided in an array type made up of anonymous object elements */
-    data.forEach(function(elArticle){
+    data[0].forEach(function(elArticle){
       dataArticle[elArticle.article_id] = elArticle;
       dataArticle[elArticle.article_id].comment = [];
     });
-    db.any("SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow)
-    .then(function(dataComment){
-      dataComment.forEach(function(elComment){
-        var newcomment = {
-          commenter_ip:elComment.commenter_ip,
-          comment_content:elComment.comment_content,
-          comment_id:elComment.comment_id
-        };
-        dataArticle[elComment.article_id].comment.push(newcomment);
-      });
-      callback(dataArticle);
-    })
-    .catch(function(err){
-      res.render("error.ejs",{errormsg:err});
+
+    data[1].forEach(function(elComment){
+      var newcomment = {
+        commenter_ip:elComment.commenter_ip,
+        comment_content:elComment.comment_content,
+        comment_id:elComment.comment_id
+      };
+      dataArticle[elComment.article_id].comment.push(newcomment);
     });
+
+    data[2].forEach(function(elScore){
+      dataArticle[elScore.article_id].score = elScore.sum;
+    });
+
+    /* sorted by score */
+    dataArticle.sort(function(a,b){
+      return Math.round(a.score) - Math.round(b.score);
+    });
+
+    callback(dataArticle);
   })
   .catch(function(err){
     res.render("error.ejs",{errormsg:err});
@@ -109,6 +137,19 @@ app.post("/write",function(req,res){
   });
 });
 
+app.post("/comment",function(req,res){
+  console.log("comment add request:");
+  console.log(req.body.replyText, req.body.articleid);
+  db.none("INSERT INTO sw_comment (commenter_ip, comment_content, article_id) VALUES ($1, $2, $3)",[getIP(req),req.body.replyText,req.body.articleid])
+  .then(function(){
+    res.redirect("/");
+  });
+});
+
+app.get("/info",function(req,res){
+  res.render("info.ejs")
+});
+
 app.get("/:articleid",function(req,res){
   /* safety measure for parse error*/
   var articleid = Math.round(req.params.articleid);
@@ -127,35 +168,53 @@ app.get("/:articleid",function(req,res){
     });
   }else if(req.query.act=="up"){
     /* recommendation */
-    db.one("SELECT exists(SELECT score FROM sw_score WHERE scorer_ip=$1 AND article_id=$2)",[getIP(req),articleid])     .then(function(data){
-      console.log(data);
-      if(data.exists == "f"){
-        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",[getIP(req), true, articleid])
+    getVote(getIP(req), function(scoreX){
+      var score = Math.round(scoreX);
+      if (score == 1) {
+        console.log(score + " plus voted before!");
+        res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
+      }else if(score == -1){
+        console.log(score + " minus voted before!");
+        db.none("UPDATE sw_score SET score=1 WHERE scorer_ip=$1 AND article_id=$2",
+        [getIP(req),articleid])
         .then(function(){
           res.redirect("/");
-        })
-        .catch(function(err){
-          res.render("error.ejs",{errormsg:err});
         });
       }else{
-        res.render("error.ejs",{errormsg:"이미 투표한 글입니다"});
+        console.log(score + " haven't voted before!");
+        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
+        [getIP(req),1,articleid])
+        .then(function(){
+          res.redirect("/");
+        });
       }
-    })
-    .catch(function(err){
-      res.render("error.ejs",{errormsg:err});
     });
-
   }else if(req.query.act=="down"){
     /* denunciation */
-    db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",[getIP(req), false, articleid])
-    .then(function(){
-      res.redirect("/");
-    })
-    .catch(function(err){
-      res.render("error.ejs",{errormsg:err});
+    getVote(getIP(req), function(scoreX){
+      var score = Math.round(scoreX);
+      if (score == -1) {
+        console.log(score + " minus voted before!");
+        res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
+      }else if(score == 1){
+        console.log(score + " plus voted before!");
+        db.none("UPDATE sw_score SET score=-1 WHERE scorer_ip=$1 AND article_id=$2",
+        [getIP(req),articleid])
+        .then(function(){
+          res.redirect("/");
+        });
+      }else{
+        console.log(score + " haven't voted before!");
+        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
+        [getIP(req),-1,articleid])
+        .then(function(){
+          res.redirect("/");
+        });
+      }
     });
   }
 });
+
 
 app.post("/:articleid/deleteconfirm",function(req,res){
   var articleid = Math.round(req.params.articleid);
