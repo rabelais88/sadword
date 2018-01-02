@@ -9,7 +9,6 @@ var uuid = require("uuid/v4");
 const pgp = require("pg-promise")(/* promise options */);
 const moment = require("moment");
 
-
 const pgconfig = {
   user: "postgres",
   host: "localhost",
@@ -19,7 +18,6 @@ const pgconfig = {
   /*
     if it's heroku, replacce those with this:
     connectionString : "postgresql://dbuser: ...."
-
   */
   poolSize:10, /* max number of clients */
   idleTimeoutMillis:30000
@@ -129,7 +127,7 @@ app.post("/write",function(req,res){
   /* always add .body to access req data */
   console.log(nowFormatted + " - article add request : " + req.body.article + "(" + getIP(req) + ")");
   db.none("INSERT INTO sw_article (writer_ip, article_content, article_time, article_password) VALUES ($1, $2, $3, $4)", [getIP(req), req.body.article, nowFormatted, req.body.password])
-  .then(function(data){
+  .then(function(){
     res.redirect("/");
   })
   .catch(function(err){

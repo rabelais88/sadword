@@ -19,7 +19,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">취소</button>
-            <button type="button" class="btn btn-primary" id="confirmReply">댓글 달기</button>
+            <button type="button" class="btn btn-primary" data-dismiss="modal" id="confirmReply">댓글 달기</button>
           </div>
         </div>
       </div>
@@ -27,6 +27,9 @@
     <script>
       $(function(){
         $("#modalReply").on('show.bs.modal', function (event) {
+          if($("#replyText").val()){
+            $("#replyText").val("");
+          }
           var button = $(event.relatedTarget);
           var articleid = button.data("article");
           $("#replyText").data("articleid", articleid);
