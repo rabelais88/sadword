@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html>
   <% include partials/header %>
@@ -21,4 +22,29 @@
       <% }) %>
     </div>
   </body>
+=======
+<!DOCTYPE html>
+<html>
+  <% include partials/header %>
+  <!-- body -->
+  <body>
+    <%include partials/nav %>
+    <div class="container-fluid content darken"></div>
+    <div></div>
+    <div class="list-group">
+      <% data.forEach(function(el,i){ %>
+      <div class="list-group-item flex-column align-items-start">
+        <p class="mb-1"><%= el.article_content %></p>
+        <small class="text-muted"><%= el.writer_ip %></small>
+        <form action="/<%= i %>/">
+          <button type="submit" class="btn btn-outline-secondary" value="up" name="act"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
+          <button type="submit" class="btn btn-outline-secondary" value="down" name="act"><i class="fa fa-exclamation" aria-hidden="true"></i>신고</button>
+          <button type="submit" class="btn btn-link" value="edit" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i></button>
+          <button type="submit" class="btn btn-link" value="delete" name="act"><i class="fa fa-trash" aria-hidden="true"></i></button>
+        </form>
+      </div>
+      <% }) %>
+    </div>
+  </body>
+>>>>>>> f4f4039465db44cf204d6f73b63f3f5ced04124a
 </html>

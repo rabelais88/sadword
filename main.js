@@ -13,7 +13,7 @@ const pgconfig = {
   user: "postgres",
   host: "localhost",
   database: "sadword",
-  password: "devtest1",
+  password: "testhotel1",
   port:5432,
   /*
     if it's heroku, replacce those with this:
@@ -42,6 +42,14 @@ http.listen(process.env.PORT || 3000,function(){
   create table sw_comment (comment_id serial primary key, commenter_ip inet, article_id integer references sw_article(article_id), comment_content varchar(150));
 */
 
+/*
+  some tips before continue coding...
+  1. since versions of node higher than 6.x.x, every promise has to be chained with catch
+     this means every pg-promise functions has to be chained with .catch
+  2. pg-promise often returns very weird errors. ALWAYS trace errors with process.on('unhandledRejection', r => console.log(r));
+     some of pg-promise errors are caused by thought-to-be-unrelated stuff, so try find any wrong codes inside pg-promise brackets
+*/
+
 function getIP(req){
   var ip = req.headers['x-forwarded-for'] || 
   req.connection.remoteAddress || 
@@ -67,7 +75,7 @@ function getVote(ip,callback){
     }
   })
   .catch(function(err){
-    res.render("error.ejs",{errormsg:err});
+    console.log(err)
   });
 }
 
@@ -75,7 +83,7 @@ function getArticle(beginRow,endRow,callback){
   var rowLength = endRow - beginRow;
   db.multi("SELECT * FROM sw_article LIMIT " + rowLength + " OFFSET " + beginRow + 
   ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow +
-  ";select * from (select article_id, sum(score) from sw_score group by article_id) as tmp LIMIT " + rowLength + " OFFSET " + beginRow)
+  ";select * from (select article_id, sum(score::int) from sw_score group by article_id) as tmp LIMIT " + rowLength + " OFFSET " + beginRow)
   .then(function(data){
     var dataArticle = [];
     //console.log("current rowlength:" + data.length);
@@ -103,10 +111,11 @@ function getArticle(beginRow,endRow,callback){
       return Math.round(a.score) - Math.round(b.score);
     });
 
-    callback(dataArticle);
+    return callback(dataArticle);
   })
   .catch(function(err){
-    res.render("error.ejs",{errormsg:err});
+    //res.render("error.ejs",{errormsg:err}); -> this caused error because .res is not accessible inside indepenedent function. use different view model when projecting error.
+    console.log(err)
   });
 }
 
@@ -141,6 +150,8 @@ app.post("/comment",function(req,res){
   db.none("INSERT INTO sw_comment (commenter_ip, comment_content, article_id) VALUES ($1, $2, $3)",[getIP(req),req.body.replyText,req.body.articleid])
   .then(function(){
     res.redirect("/");
+  }).catch(function(err){
+    res.render("error.ejs",{errormsg:err});
   });
 });
 
@@ -177,6 +188,8 @@ app.get("/:articleid",function(req,res){
         [getIP(req),articleid])
         .then(function(){
           res.redirect("/");
+        }).catch(function(err){
+          res.render("error.ejs",{errormsg:err});
         });
       }else{
         console.log(score + " haven't voted before!");
@@ -184,6 +197,8 @@ app.get("/:articleid",function(req,res){
         [getIP(req),1,articleid])
         .then(function(){
           res.redirect("/");
+        }).catch(function(err){
+          res.render("error.ejs",{errormsg:err});
         });
       }
     });
@@ -200,6 +215,8 @@ app.get("/:articleid",function(req,res){
         [getIP(req),articleid])
         .then(function(){
           res.redirect("/");
+        }).catch(function(err){
+          res.render("error.ejs",{errormsg:err});
         });
       }else{
         console.log(score + " haven't voted before!");
@@ -207,6 +224,8 @@ app.get("/:articleid",function(req,res){
         [getIP(req),-1,articleid])
         .then(function(){
           res.redirect("/");
+        }).catch(function(err){
+          res.render("error.ejs",{errormsg:err});
         });
       }
     });
@@ -270,3 +289,5 @@ app.get("/today",function(req,res){
     res.render("error.ejs",{errormsg:err});
   });
 });
+
+process.on('unhandledRejection', r => console.log(r));
