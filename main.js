@@ -1,37 +1,54 @@
 /* sad word - node postgres + rest + jquery example web app */
-var fs = require("fs");
-var ejs = require("ejs");
-var app = require("express")();
-var http = require("http").Server(app);
-var bodyParser = require("body-parser");
-var uuid = require("uuid/v4");
+var fs = require("fs")
+var ejs = require("ejs")
+var app = require("express")()
+var http = require("http").Server(app)
+var bodyParser = require("body-parser")
+var uuid = require("uuid/v4")
 /* setting up postgreSQL */
-const pgp = require("pg-promise")(/* promise options */);
-const moment = require("moment");
-
-const pgconfig = {
-  user: "postgres",
-  host: "localhost",
-  database: "sadword",
-  password: "testhotel1",
-  port:5432,
-  /*
-    if it's heroku, replacce those with this:
-    connectionString : "postgresql://dbuser: ...."
-  */
-  poolSize:10, /* max number of clients */
-  idleTimeoutMillis:30000
-};
-
-/* connection is auto-configured from npm library, it isn't necessary */
-var db = pgp(pgconfig);
+const pgp = require("pg-promise")(/* promise options */)
+const moment = require("moment")
+const dbsettings = require("./appsettings.js")
 
 app.set("view engine", "ejs");
+
+
+function getSettings (){
+  if(!process.argv[2]){
+    console.log("config has not set up! please enter proper settings - node main.js [setting]\navailable settings are...\n")
+    Object.keys(dbsettings).map((el) => {
+      console.log(el)
+    })
+    process.exit()
+  }else{
+    let result = {};
+    Object.keys(dbsettings).map((el) => {
+      if(el === process.argv[2]){
+        if(dbsettings[el] instanceof Object){
+          //if setting is an object
+          result = Object.assign(dbsettings[el])
+        }else{
+          //if setting is a string
+          result = dbsettings[el]
+        }
+      }
+    })
+    return result;
+  }
+}
+
+const pgconfig = getSettings()
+console.log("try logging in with the info below :")
+console.log(pgconfig)
+/* connection is auto-configured from npm library, it isn't necessary */
+var db = pgp(pgconfig)
+
+
 /* initialize bodyparser to build up RESTful app */
 app.use(bodyParser.urlencoded({ extended:false}));
 app.use(bodyParser.json());
   
-http.listen(process.env.PORT || 3000,function(){
+http.listen(process.env.PORT || 3000, function(){
   console.log("server is up at " + this.address().port);
 });
   
@@ -159,23 +176,37 @@ app.get("/info",function(req,res){
   res.render("info.ejs")
 });
 
+app.get("/modify/:articleid", (req,res) => {
+  const articleid = Math.round(req.params.articleid)
+  console.log("article No." + articleid + " - request modify")
+  db.one("SELECT article_content FROM sw_article WHERE article_id=" + articleid)
+  .then((sqldata) => {
+    res.render("modify.ejs", {data: {id:articleid, content:sqldata.article_content} })
+  })
+  .catch((err) => {
+    res.render("error.ejs",{errormsg:err})
+  })
+})
+
+app.get("/delete/:articleid", (req,res) => {
+  console.log("article No." + articleid + " - request delete")
+  const articleid = Math.round(req.params.articleid)
+  res.render("delete.ejs", {data:articleid});
+})
+
+app.post("/thumbup/:articleid", (req,res) => {
+  const articleid = Math.round(req.params.articleid)
+  console.log("article No." + articleid + " - request thumbup")
+})
+
+app.post("/thumbdown/:articleid", (req, res) => {
+  const articleid = Math.round(req.params.articleid)
+  console.log("article No." + articleid + " - request thumbdown")
+})
+
 app.get("/:articleid",function(req,res){
-  /* safety measure for parse error*/
-  var articleid = Math.round(req.params.articleid);
-  console.log("article No." + articleid + " - request : " +  req.query.act);
-  if(req.query.act=="delete"){
-    /* deleting article */
-    res.render("delete.ejs", {data:articleid});
-  }else if(req.query.act=="modify"){
-    /* modifying article */
-    db.one("SELECT article_content FROM sw_article WHERE article_id=" + articleid)
-    .then(function(data){
-      res.render("modify.ejs", {article_content:data.article_content});
-    })
-    .catch(function(err){
-      res.render("error.ejs",{errormsg:err});
-    });
-  }else if(req.query.act=="up"){
+
+  if(req.query.act=="up"){
     /* recommendation */
     getVote(getIP(req), function(scoreX){
       var score = Math.round(scoreX);
@@ -233,7 +264,7 @@ app.get("/:articleid",function(req,res){
 });
 
 
-app.post("/:articleid/deleteconfirm",function(req,res){
+app.post("/deleteconfirm/:articleid",function(req,res){
   var articleid = Math.round(req.params.articleid);
   db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
   .then(function(data){
@@ -255,7 +286,7 @@ app.post("/:articleid/deleteconfirm",function(req,res){
   });
 });
 
-app.post("/:articleid/modifyconfirm",function(req,res){
+app.post("/modifyconfirm/:articleid",function(req,res){
   var articleid = Math.round(req.params.articleid);
   db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
   .then(function(data){

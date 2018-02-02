@@ -6,10 +6,10 @@
     <%include partials/nav %>
     <div class="container-fluid content darken">
     <!-- if POST method is not defined, the whole content is likely to be disclosed on the address -->
-    <form method="POST" action="modifyconfirm" id="frmModify">
+    <form method="POST" action="/modifyconfirm/<%= data.id %>/" id="frmModify">
       <div class="form-group">
         <label for="article" class="darken">울고 싶어요 왜냐면...(최대200자)</label>
-        <textarea class="form-control darken" rows="5" id="article" name="article" maxlength="200"><%= article_content %></textarea>
+        <textarea class="form-control darken" rows="5" id="article" name="article" maxlength="200"><%= data.content %></textarea>
       </div>
       <div class="form-group">
         <label for="password" class="darken">비밀번호(최대 15자리):</label>

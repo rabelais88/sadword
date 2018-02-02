@@ -47,12 +47,12 @@
       <% articles.forEach(function(el){ %>
         <p><%= el.article_content %></p>
         <small class="text-muted"><%= el.writer_ip %></small>
-        <form action="<%= el.article_id %>/">
+        <form method="POST">
           <%= el.score %>
-          <button type="submit" class="btn btn-link" value="up" name="act"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
-          <button type="submit" class="btn btn-link" value="down" name="act"><i class="fa fa-exclamation" aria-hidden="true"></i>신고</button>
-          <button type="submit" class="btn btn-link" value="modify" name="act"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</button>
-          <button type="submit" class="btn btn-link" value="delete" name="act"><i class="fa fa-trash" aria-hidden="true"></i>삭제</button>
+          <button type="submit" class="btn btn-link" formaction="/thumbup/<%= el.article_id %>"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
+          <button type="submit" class="btn btn-link" formaction="/thumbdown/<%= el.article_id %>"><i class="fa fa-exclamation" aria-hidden="true"></i>신고</button>
+          <a class="btn btn-link" href="/modify/<%= el.article_id %>"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>수정</a>
+          <a class="btn btn-link" href="/delete/<%= el.article_id %>"><i class="fa fa-trash" aria-hidden="true"></i>삭제</a>
           <button type="button" class="btn btn-link" data-toggle="modal" data-target="#modalReply" data-article="<%= el.article_id %>"><i class="fa fa-reply" aria-hidden="true"></i>댓글 달기</button>
         </form>
         <% if(el.comment) { el.comment.forEach(function(elComment, i){ %>
