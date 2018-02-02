@@ -47,6 +47,7 @@
       <% articles.forEach(function(el){ %>
         <p><%= el.article_content %></p>
         <small class="text-muted"><%= el.writer_ip %></small>
+
         <form method="POST">
           <%= el.score %>
           <button type="submit" class="btn btn-link" formaction="/thumbup/<%= el.article_id %>"><i class="fa fa-thumbs-o-up" aria-hidden="true"></i>공감</button>
