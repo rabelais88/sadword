@@ -9,6 +9,7 @@ var uuid = require("uuid/v4")
 const pgp = require("pg-promise")(/* promise options */)
 const moment = require("moment")
 const dbsettings = require("./appsettings.js")
+const articlePerPage = 10;
 
 app.set("view engine", "ejs");
 
@@ -111,7 +112,8 @@ function getArticle(beginRow,endRow,callback){
   db.multi("SELECT art.article_id, art.writer_ip, art.article_content, art.article_time, sco.score FROM sw_article art left outer join (select article_id \
             , sum(case when score=false then -1 when score=true then 1 end) as score from sw_score group by article_id) sco on art.article_id = sco.article_id \
             WHERE art.article_id BETWEEN " + beginRow + " AND " + endRow +
-           ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow)
+           ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow +
+           ";SELECT count(*) as articlecount FROM sw_article;")
   .then(function(data){
 
     //sum of score column must be provided as 'score'
@@ -132,7 +134,12 @@ function getArticle(beginRow,endRow,callback){
       dataArticle[elComment.article_id].comment.push(newcomment)
     })
 
-    return callback(dataArticle)
+    const maxArticle = data[2][0].articlecount
+    //modulo doesn't work here....
+    const maxPage = Math.ceil(maxArticle / articlePerPage)
+    console.log(`maxPage = ${maxPage}`)
+
+    return callback(dataArticle, maxPage)
   })
   .catch(function(err){
     //res.render("error.ejs",{errormsg:err}); -> this caused error because .res is not accessible inside indepenedent function. use different view model when projecting error.
@@ -142,18 +149,18 @@ function getArticle(beginRow,endRow,callback){
 
 app.get("/", (req,res) => {
   /* EVERY postgres action is async. => always use callback to print out the result */
-  getArticle(0,9,function(dataRes){
-    res.render("index.ejs", {articles:dataRes, page:1});
-  });
+  res.redirect("/page/1");
 });
 
 app.get("/page/:pagenum", (req,res) => {
-  if(req.params.pagenum <= 1){
-    res.redirect("/");
+  if(req.params.pagenum < 1){
+    res.redirect("/page/1");
   }else{
     const curPage = Math.round(req.params.pagenum) - 1
-    getArticle(curPage * 10, curPage * 10 + 10, (dataRes)=> {
-      res.render("index.ejs", {articles:dataRes, page:curPage + 1})
+    getArticle(curPage * articlePerPage, curPage * articlePerPage + (articlePerPage - 1), (dataRes, maxPage)=> {
+      let nextPage = curPage + 2
+      if(curPage + 1>= maxPage){ nextPage = curPage + 1 }
+      res.render("index.ejs", {articles:dataRes, pagePrev: curPage, pageCur:curPage + 1, pageNext: nextPage})
     })
   }
 });
