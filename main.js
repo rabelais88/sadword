@@ -65,6 +65,17 @@ http.listen(process.env.PORT || 3000, function(){
      this means every pg-promise functions has to be chained with .catch
   2. pg-promise often returns very weird errors. ALWAYS trace errors with process.on('unhandledRejection', r => console.log(r));
      some of pg-promise errors are caused by thought-to-be-unrelated stuff, so try find any wrong codes inside pg-promise brackets
+  3. when getting score vote sum(postgresql join), forEach function in EJS is subject to be changed
+     by duplicated columns of same name. before loading up the article.
+     postgresql에서 join을 하고 나면 같은 이름의 열이 두개가 생겨버리는데, 자동으로 없어지지 않기 때문에
+     직접 제거해줘야함. 내가 링크를 잘못 걸어서 그런지는 모르겠음. EJS에서는 id 열 값이 같으면
+     오류가 발생해서 표시를 안하거나 중복표기(가장 나중에 나타나는 값만 나타냄)을 하게 되기 때문에
+     주의해야함. 부모(테이블)가 다른 것은 SQL상에서는 감지가 가능하지만 외부 코드에서는 감지가
+     안되므로 주의!
+*/
+
+/*
+  some parts are written in classic JS, some parts are written in pursuant to ES6 standard
 */
 
 function getIP(req){
@@ -97,38 +108,31 @@ function getVote(ip,callback){
 }
 
 function getArticle(beginRow,endRow,callback){
-  var rowLength = endRow - beginRow;
-  db.multi("SELECT * FROM sw_article LIMIT " + rowLength + " OFFSET " + beginRow + 
-  ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow +
-  ";select * from (select article_id, sum(score::int) from sw_score group by article_id) as tmp LIMIT " + rowLength + " OFFSET " + beginRow)
+  db.multi("SELECT art.article_id, art.writer_ip, art.article_content, art.article_time, sco.score FROM sw_article art left outer join (select article_id \
+            , sum(case when score=false then -1 when score=true then 1 end) as score from sw_score group by article_id) sco on art.article_id = sco.article_id \
+            WHERE art.article_id BETWEEN " + beginRow + " AND " + endRow +
+           ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow)
   .then(function(data){
-    var dataArticle = [];
+
+    //sum of score column must be provided as 'score'
+    var dataArticle = []
     //console.log("current rowlength:" + data.length);
     /* data is provided in an array type made up of anonymous object elements */
     data[0].forEach(function(elArticle){
-      dataArticle[elArticle.article_id] = elArticle;
-      dataArticle[elArticle.article_id].comment = [];
-    });
+      dataArticle[elArticle.article_id] = elArticle
+      dataArticle[elArticle.article_id].comment = []
+    })
 
     data[1].forEach(function(elComment){
       var newcomment = {
         commenter_ip:elComment.commenter_ip,
         comment_content:elComment.comment_content,
         comment_id:elComment.comment_id
-      };
-      dataArticle[elComment.article_id].comment.push(newcomment);
-    });
+      }
+      dataArticle[elComment.article_id].comment.push(newcomment)
+    })
 
-    data[2].forEach(function(elScore){
-      dataArticle[elScore.article_id].score = elScore.sum;
-    });
-
-    /* sorted by score */
-    dataArticle.sort(function(a,b){
-      return Math.round(a.score) - Math.round(b.score);
-    });
-
-    return callback(dataArticle);
+    return callback(dataArticle)
   })
   .catch(function(err){
     //res.render("error.ejs",{errormsg:err}); -> this caused error because .res is not accessible inside indepenedent function. use different view model when projecting error.
@@ -136,11 +140,22 @@ function getArticle(beginRow,endRow,callback){
   });
 }
 
-app.get("/",function(req,res){
+app.get("/", (req,res) => {
   /* EVERY postgres action is async. => always use callback to print out the result */
-  getArticle(0,10,function(dataRes){
-    res.render("index.ejs", {articles:dataRes});
+  getArticle(0,9,function(dataRes){
+    res.render("index.ejs", {articles:dataRes, page:1});
   });
+});
+
+app.get("/page/:pagenum", (req,res) => {
+  if(req.params.pagenum <= 1){
+    res.redirect("/");
+  }else{
+    const curPage = Math.round(req.params.pagenum) - 1
+    getArticle(curPage * 10, curPage * 10 + 10, (dataRes)=> {
+      res.render("index.ejs", {articles:dataRes, page:curPage + 1})
+    })
+  }
 });
 
 app.get("/write",function(req,res){
@@ -197,72 +212,62 @@ app.get("/delete/:articleid", (req,res) => {
 app.post("/thumbup/:articleid", (req,res) => {
   const articleid = Math.round(req.params.articleid)
   console.log("article No." + articleid + " - request thumbup")
+  getVote(getIP(req), function(scoreX){
+    var score = Math.round(scoreX);
+    if (score == 1) {
+      console.log(score + " plus voted before!");
+      res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
+    }else if(score == -1){
+      console.log(score + " minus voted before!");
+      db.none("UPDATE sw_score SET score=1 WHERE scorer_ip=$1 AND article_id=$2",
+      [getIP(req),articleid])
+      .then(function(){
+        res.redirect("/");
+      }).catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }else{
+      console.log(score + " haven't voted before!");
+      db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
+      [getIP(req),1,articleid])
+      .then(function(){
+        res.redirect("/");
+      }).catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }
+  });
 })
 
 app.post("/thumbdown/:articleid", (req, res) => {
   const articleid = Math.round(req.params.articleid)
   console.log("article No." + articleid + " - request thumbdown")
+  getVote(getIP(req), function(scoreX){
+    var score = Math.round(scoreX);
+    if (score == -1) {
+      console.log(score + " minus voted before!");
+      res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
+    }else if(score == 1){
+      console.log(score + " plus voted before!");
+      db.none("UPDATE sw_score SET score=-1 WHERE scorer_ip=$1 AND article_id=$2",
+      [getIP(req),articleid])
+      .then(function(){
+        res.redirect("/");
+      }).catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }else{
+      console.log(score + " haven't voted before!");
+      db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
+      [getIP(req),-1,articleid])
+      .then(function(){
+        res.redirect("/");
+      }).catch(function(err){
+        res.render("error.ejs",{errormsg:err});
+      });
+    }
+  });
 })
-
-app.get("/:articleid",function(req,res){
-
-  if(req.query.act=="up"){
-    /* recommendation */
-    getVote(getIP(req), function(scoreX){
-      var score = Math.round(scoreX);
-      if (score == 1) {
-        console.log(score + " plus voted before!");
-        res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
-      }else if(score == -1){
-        console.log(score + " minus voted before!");
-        db.none("UPDATE sw_score SET score=1 WHERE scorer_ip=$1 AND article_id=$2",
-        [getIP(req),articleid])
-        .then(function(){
-          res.redirect("/");
-        }).catch(function(err){
-          res.render("error.ejs",{errormsg:err});
-        });
-      }else{
-        console.log(score + " haven't voted before!");
-        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
-        [getIP(req),1,articleid])
-        .then(function(){
-          res.redirect("/");
-        }).catch(function(err){
-          res.render("error.ejs",{errormsg:err});
-        });
-      }
-    });
-  }else if(req.query.act=="down"){
-    /* denunciation */
-    getVote(getIP(req), function(scoreX){
-      var score = Math.round(scoreX);
-      if (score == -1) {
-        console.log(score + " minus voted before!");
-        res.render("error.ejs",{errormsg:"이미 투표를 했습니다"}); 
-      }else if(score == 1){
-        console.log(score + " plus voted before!");
-        db.none("UPDATE sw_score SET score=-1 WHERE scorer_ip=$1 AND article_id=$2",
-        [getIP(req),articleid])
-        .then(function(){
-          res.redirect("/");
-        }).catch(function(err){
-          res.render("error.ejs",{errormsg:err});
-        });
-      }else{
-        console.log(score + " haven't voted before!");
-        db.none("INSERT INTO sw_score (scorer_ip, score, article_id) VALUES ($1, $2, $3)",
-        [getIP(req),-1,articleid])
-        .then(function(){
-          res.redirect("/");
-        }).catch(function(err){
-          res.render("error.ejs",{errormsg:err});
-        });
-      }
-    });
-  }
-});
-
 
 app.post("/deleteconfirm/:articleid",function(req,res){
   var articleid = Math.round(req.params.articleid);
