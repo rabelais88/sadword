@@ -37,7 +37,7 @@
         $("#confirmReply").on("click",function(){
           console.log($("#replyText").data("articleid"));
           $.ajax({type:"POST",
-            url:"comment/",
+            url:"/comment/",
             data:{replyText:$("#replyText").val(),articleid:$("#replyText").data("articleid")}
           });
         });

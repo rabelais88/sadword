@@ -109,10 +109,12 @@ function getVote(ip,callback){
 }
 
 function getArticle(beginRow,endRow,callback){
-  db.multi("SELECT art.article_id, art.writer_ip, art.article_content, art.article_time, sco.score FROM sw_article art left outer join (select article_id \
-            , sum(case when score=false then -1 when score=true then 1 end) as score from sw_score group by article_id) sco on art.article_id = sco.article_id \
-            WHERE art.article_id BETWEEN " + beginRow + " AND " + endRow +
-           ";SELECT * FROM sw_comment WHERE article_id BETWEEN " + beginRow + " AND " + endRow +
+  //TODO: need performance optimization on comment loading
+  const rowLength = endRow - beginRow
+  db.multi("SELECT art.article_id, art.writer_ip, art.article_content, art.article_time, sco.score FROM sw_article art LEFT OUTER JOIN (select article_id \
+            , sum(score) AS score FROM sw_score GROUP BY article_id) sco ON art.article_id = sco.article_id \
+            LIMIT " + rowLength + " OFFSET " + beginRow +
+           ";SELECT * FROM sw_comment" +
            ";SELECT count(*) as articlecount FROM sw_article;")
   .then(function(data){
 
@@ -135,7 +137,6 @@ function getArticle(beginRow,endRow,callback){
     })
 
     const maxArticle = data[2][0].articlecount
-    //modulo doesn't work here....
     const maxPage = Math.ceil(maxArticle / articlePerPage)
     console.log(`maxPage = ${maxPage}`)
 
@@ -153,11 +154,12 @@ app.get("/", (req,res) => {
 });
 
 app.get("/page/:pagenum", (req,res) => {
+  console.log(`requested page: ${req.params.pagenum}`)
   if(req.params.pagenum < 1){
-    res.redirect("/page/1");
+    res.redirect("/page/1")
   }else{
     const curPage = Math.round(req.params.pagenum) - 1
-    getArticle(curPage * articlePerPage, curPage * articlePerPage + (articlePerPage - 1), (dataRes, maxPage)=> {
+    getArticle(curPage * articlePerPage, curPage * articlePerPage + articlePerPage, (dataRes, maxPage)=> {
       let nextPage = curPage + 2
       if(curPage + 1>= maxPage){ nextPage = curPage + 1 }
       res.render("index.ejs", {articles:dataRes, pagePrev: curPage, pageCur:curPage + 1, pageNext: nextPage})
@@ -211,9 +213,9 @@ app.get("/modify/:articleid", (req,res) => {
 })
 
 app.get("/delete/:articleid", (req,res) => {
-  console.log("article No." + articleid + " - request delete")
   const articleid = Math.round(req.params.articleid)
-  res.render("delete.ejs", {data:articleid});
+  console.log("article No." + articleid + " - request delete")
+  res.render("delete.ejs", {articleid:articleid});
 })
 
 app.post("/thumbup/:articleid", (req,res) => {

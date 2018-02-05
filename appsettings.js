@@ -12,6 +12,13 @@ const dbsettings = {
     poolSize:10, /* max number of clients */
     idleTimeoutMillis:30000
   },
+  home:{
+    user:"postgres",
+    host:"localhost",
+    database:"sadword",
+    password:"devtest1",
+    port:5432
+  },
   heroku:"postgresql://secret url"
 }
 

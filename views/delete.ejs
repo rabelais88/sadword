@@ -7,7 +7,7 @@
     <%include partials/nav %>
     <div class="container-fluid content darken">
       <!-- if POST method is not defined, the whole content is likely to be disclosed on the address -->
-      <form method="POST" action="deleteconfirm" id="frmDelete">
+      <form method="POST" action="/deleteconfirm/<%= articleid %>" id="frmDelete">
         <h4>등록된 글을 삭제합니다.</h4>
         <div class="form-group">
           <label for="password" class="darken">비밀번호(최대 15자리):</label>
