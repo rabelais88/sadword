@@ -9,9 +9,11 @@ var uuid = require("uuid/v4")
 const pgp = require("pg-promise")(/* promise options */)
 const moment = require("moment")
 const dbsettings = require("./appsettings.js")
-const articlePerPage = 10;
+const bcrypt = require('bcrypt')
+const articlePerPage = 10
+const hashSaltRound = 10
 
-app.set("view engine", "ejs");
+app.set("view engine", "ejs")
 
 
 function getSettings (){
@@ -34,7 +36,7 @@ function getSettings (){
         }
       }
     })
-    return result;
+    return result
   }
 }
 
@@ -46,12 +48,12 @@ var db = pgp(pgconfig)
 
 
 /* initialize bodyparser to build up RESTful app */
-app.use(bodyParser.urlencoded({ extended:false}));
-app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended:false}))
+app.use(bodyParser.json())
   
 http.listen(process.env.PORT || 3000, function(){
-  console.log("server is up at " + this.address().port);
-});
+  console.log("server is up at " + this.address().port)
+})
   
 /*
   db structure:
@@ -84,13 +86,13 @@ function getIP(req){
   req.connection.remoteAddress || 
   req.socket.remoteAddress ||
   (req.connection.socket ? req.connection.socket.remoteAddress : null);
-  return ip;
+  return ip
 }
 
 function getVote(ip,callback){
   db.any("SELECT score FROM sw_score WHERE scorer_ip=$1",[ip])
-  .then(function(data){
-    console.log("previous score data from " + ip + " : " + data);
+  .then((data) => {
+    console.log("previous score data from " + ip + " : " + data)
     /* 
        source of all problem...probably something has to do with dynamic type 
        try...catch instead of if(data) or if(data.length > 0)
@@ -103,7 +105,7 @@ function getVote(ip,callback){
       callback(0);
     }
   })
-  .catch(function(err){
+  .catch((err) => {
     console.log(err)
   });
 }
@@ -176,24 +178,28 @@ app.post("/write",function(req,res){
   var nowFormatted = currentTime.format("YYYY-MM-DD HH:mm:ss");
   /* always add .body to access req data */
   console.log(nowFormatted + " - article add request : " + req.body.article + "(" + getIP(req) + ")");
-  db.none("INSERT INTO sw_article (writer_ip, article_content, article_time, article_password) VALUES ($1, $2, $3, $4)", [getIP(req), req.body.article, nowFormatted, req.body.password])
-  .then(function(){
-    res.redirect("/");
+  bcrypt.hash(req.body.password,hashSaltRound,(err,hash)=>{
+    db.none("INSERT INTO sw_article (writer_ip, article_content, article_time, article_password) VALUES ($1, $2, $3, $4)", [getIP(req), req.body.article, nowFormatted, hash])
+    .then(function(){
+      res.redirect("/");
+    })
+    .catch(function(err){
+      res.render("error.ejs",{errormsg:err});
+    })
   })
-  .catch(function(err){
-    res.render("error.ejs",{errormsg:err});
-  });
 });
 
 app.post("/comment",function(req,res){
   console.log("comment add request:");
   console.log(req.body.replyText, req.body.articleid);
-  db.none("INSERT INTO sw_comment (commenter_ip, comment_content, article_id) VALUES ($1, $2, $3)",[getIP(req),req.body.replyText,req.body.articleid])
-  .then(function(){
-    res.redirect("/");
-  }).catch(function(err){
-    res.render("error.ejs",{errormsg:err});
-  });
+  bcrypt.hash(req.body.replyPassword,hashSaltRound,(err,hash)=>{
+    db.none("INSERT INTO sw_comment (commenter_ip, comment_content, article_id, comment_password) VALUES ($1, $2, $3, $4)",[getIP(req),req.body.replyText,req.body.articleid,hash])
+    .then(function(){
+      res.redirect("/");
+    }).catch(function(err){
+      res.render("error.ejs",{errormsg:err});
+    });
+  })
 });
 
 app.get("/info",function(req,res){
@@ -215,7 +221,7 @@ app.get("/modify/:articleid", (req,res) => {
 app.get("/delete/:articleid", (req,res) => {
   const articleid = Math.round(req.params.articleid)
   console.log("article No." + articleid + " - request delete")
-  res.render("delete.ejs", {articleid:articleid});
+  res.render("delete.ejs", {articleid:articleid})
 })
 
 app.post("/thumbup/:articleid", (req,res) => {
@@ -283,17 +289,19 @@ app.post("/deleteconfirm/:articleid",function(req,res){
   db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
   .then(function(data){
     console.log("received pw : " + req.body.password + " =?= pw on db : " + data.article_password);
-    if (req.body.password == data.article_password || data.article_password == null){
-      db.none("DELETE FROM sw_article WHERE article_id=" + articleid)
-      .then(function(){
-        res.redirect("/");
-      })
-      .catch(function(err){
-        res.render("error.ejs",{errormsg:err});
-      });
-    }else{
-      res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
-    }
+    bcrypt.compare(req.body.password, data.article_password, (err,pwcheck)=>{
+      if (pwcheck || data.article_password == null){
+        db.none("DELETE FROM sw_article WHERE article_id=" + articleid)
+        .then(function(){
+          res.redirect("/");
+        })
+        .catch(function(err){
+          res.render("error.ejs",{errormsg:err});
+        });
+      }else{
+        res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
+      }
+    })
   })
   .catch(function(err){
     res.render("error.ejs",{errormsg:err});
@@ -305,17 +313,19 @@ app.post("/modifyconfirm/:articleid",function(req,res){
   db.one("SELECT article_password FROM sw_article WHERE article_id=" + articleid)
   .then(function(data){
     console.log("received pw : " + req.body.password + " =?= pw on db : " + data.article_password);
-    if (req.body.password == data.article_password || data.article_password == null){
-      db.none("UPDATE sw_article SET article_content='" + req.body.article + "' WHERE article_id=" + articleid)
-      .then(function(){
-        res.redirect("/");
-      })
-      .catch(function(err){
-        res.render("error.ejs",{errormsg:err});
-      });
-    }else{
-      res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
-    }
+    bcrypt.compare(req.body.password, data.article_password, (err,pwcheck)=>{
+      if (req.body.password == data.article_password || data.article_password == null){
+        db.none("UPDATE sw_article SET article_content='" + req.body.article + "' WHERE article_id=" + articleid)
+        .then(function(){
+          res.redirect("/");
+        })
+        .catch(function(err){
+          res.render("error.ejs",{errormsg:err});
+        });
+      }else{
+        res.render("error.ejs",{errormsg:"비밀번호가 일치하지 않습니다"});
+      }
+    })
   })
   .catch(function(err){
     res.render("error.ejs",{errormsg:err});
